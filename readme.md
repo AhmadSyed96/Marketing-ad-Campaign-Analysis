@@ -1,7 +1,7 @@
 # Marketing-Ad Campaign Analysis
 this project focuses on resolving inconsistencies found in our dataset and scaling the losses incurred due to it
 
-for more detailed analysis, open the jupyter notebook which breaks down into the following structure:
+for a more in-depth analysis, open the jupyter notebook which breaks down into the following structure:
 
 1. after taking a look at segments of conversion rates we see that the house ads marketing team has an issue with it after the 11th
 
@@ -15,7 +15,6 @@ for more detailed analysis, open the jupyter notebook which breaks down into the
 
 we are given the following table describing customer data
 
-|---------------------|---------|
 |       column        |  type   |
 |---------------------|---------|
 | userid              | numeric |
@@ -32,11 +31,10 @@ we are given the following table describing customer data
 | is_retained         | numeric |
 | day_of_week         | text    |
 | channel_code        | text    |
-|---------------------|---------|
 
 upon exploratory analysis we can see that there is a problem with conversion rates, particularly with the house ads conversion channel
 
-```
+```python
 daily_conversion_rate_by_channel = conversion_rate(marketing, ['date_served', 'subscription_channel'])
 plotting_csv(daily_conversion_rate_by_channel.unstack(level=1))
 ```
@@ -45,7 +43,7 @@ plotting_csv(daily_conversion_rate_by_channel.unstack(level=1))
 
 upon investigating the languages those ads were delivered on for each date we can see that non-english languages were not served as regularly as english ads
 
-```
+```python
 house_ads = marketing[marketing.marketing_channel=='House Ads']
 conv_lang_channel = conversion_rate(house_ads, ['date_served', 'language_displayed'])
 
@@ -58,7 +56,7 @@ plotting_conv(conv_lang_df)
 
 after pivoting the df we can see the wrong language was served after the 11 of january
 
-```
+```python
 house_ads['is_correct_lang'] = np.where(house_ads['language_displayed']==house_ads['language_preferred'],'yes','no')
 language_check = house_ads.groupby(['date_served','is_correct_lang'])['user_id'].count()
 language_check_df = pd.DataFrame(language_check.unstack(level=1)).fillna(0)
@@ -71,7 +69,6 @@ plt.show()
 
 we get the following table
 
-|-----------------|------|-------|
 | is_correct_lang |  no  |  yes  |
 |-----------------|------|-------|
 | date_served     |      |       |
@@ -106,7 +103,6 @@ we get the following table
 | 2018-01-29      | 24.0 | 142.0 |
 | 2018-01-30      | 23.0 | 145.0 |
 | 2018-01-31      | 23.0 | 135.0 |
-|-----------------|------|-------|
 
 after pivoting, the table graphs to this
 
@@ -115,26 +111,31 @@ after pivoting, the table graphs to this
 we can see a spike occurs after the 11th in incorrect language served
 now we see how many customers we lost by this mistake by comparing and translating the amount of english ads served before the error date
 
-```
+```python
+# calculate the ratios compared to english for the period before the error
 house_ads_no_bug = house_ads[house_ads['date_served']<'2018-01-11']
-lang_conv = conversion_rate(house_ads_no_bug,['language_displayed']
-spanish_index = lang_conv['spanish'] / lang_conv['english']
-arabic_index = lang_conv['arabic'] / lang_conv['english']
-german_index = lang_conv['german'] / lang_conv['english']
+lang_conv = conversion_rate(house_ads_no_bug, ['language_displayed'])
+spanish_index = lang_conv['Spanish'] / lang_conv['English']
+arabic_index = lang_conv['Arabic'] / lang_conv['English']
+german_index = lang_conv['German'] / lang_conv['English']
 
-lang_conv_df = house_ads.groupby(['date_served','language_preferred']).agg({'user_id':'nunique','converted':'sum'})
-lang_conv_df['actual_english_rate'] = lang_conv_df['2018-01-11','2018-01-31'][('converted','English')]
+# calculate how many subscribers there should have been for each language based on the ratio for the time during the error
+lang_conv2 = house_ads.groupby(['date_served','language_preferred']).agg({'user_id':'nunique','converted':'sum'})
+lang_conv_df = pd.DataFrame(lang_conv2.unstack(level=1))
+lang_conv_df['actual_english_rate'] = lang_conv_df['2018-01-11':'2018-01-31'][('converted','English')]
 lang_conv_df['expected_spanish_rate'] = lang_conv_df.actual_english_rate * spanish_index
-lang_conv_df['expected_spanish_conversion'] = 100 * lang_conv_df['expected_spanish_rate'] / lang_conv_df[('user_id','Spanish')]
+lang_conv_df['expected_spanish_conversion'] = lang_conv_df['expected_spanish_rate'] / 100 * lang_conv_df[('user_id','Spanish')]
 lang_conv_df['expected_arabic_rate'] = lang_conv_df.actual_english_rate * arabic_index
-lang_conv_df['expected_arabic_conversion'] = 100 * lang_conv_df['expected_arabic_rate'] / lang_conv_df[('user_id','Arabic')]
+lang_conv_df['expected_arabic_conversion'] =  lang_conv_df['expected_arabic_rate'] / 100 *lang_conv_df[('user_id','Arabic')]
 lang_conv_df['expected_german_rate'] = lang_conv_df.actual_english_rate * german_index
-lang_conv_df['expected_german_conversion'] = 100 * lang_conv_df['expected_german_rate'] / lang_conv_df[('user_id','German')]
+lang_conv_df['expected_german_conversion'] =  lang_conv_df['expected_german_rate'] / 100 *lang_conv_df[('user_id','German')]
 
+# add up all of the lost subscribers
 bug_period = lang_conv_df.loc['2018-01-11':'2018-01-31']
-expected_subs = bug_period['expected_spanish_conversions'].agg('sum') + bug_period['expected_arabic_conversions'].agg('sum') + bug_period['expected_german_conversions'].agg('sum')
-actual_subs = bug_period[('converted','Spainsh'].sum() + bug_period[('converted','Arabic'].sum() + bug_period[('converted','German'].sum()
+expected_subs = bug_period['expected_spanish_conversion'].sum() + bug_period['expected_arabic_conversion'].sum() + bug_period['expected_german_conversion'].sum()
+actual_subs = bug_period[('converted','Spanish')].sum() + bug_period[('converted','Arabic')].sum() + bug_period[('converted','German')].sum()
 lost_subs = expected_subs - actual_subs
+lost_subs
 ```
 
 32 subscribers lost
